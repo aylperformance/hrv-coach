@@ -1,0 +1,15 @@
+# Configuration Render — alternative à Railway
+services:
+  - type: web
+    name: hrv-coach
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: HRV_DB_PATH
+        value: /data/hrv_coach.db
+    disk:
+      name: hrv-data
+      mountPath: /data
+      sizeGB: 1

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ athlete.display_name }} — HRV Coach{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="profile-header">
+    <div class="avatar avatar-lg avatar-green">{{ athlete.initials }}</div>
+    <div class="profile-info">
+      <h1>{{ athlete.display_name }}</h1>
+      <p class="profile-meta">
+        {{ athlete.sport or '—' }}
+        {% if athlete.birth_date %} · né{% if athlete.sex == 'F' %}e{% endif %} le {{ athlete.birth_date.strftime('%d/%m/%Y') }}{% endif %}
+        · {{ 'Femme' if athlete.sex == 'F' else 'Homme' }}
+      </p>
+    </div>
+    <div class="profile-actions">
+      <a href="/tests/new?athlete_id={{ athlete.id }}" class="btn btn-primary">Importer un test</a>
+      <a href="/athletes/{{ athlete.id }}/edit" class="btn btn-ghost">Modifier</a>
+      <form method="post" action="/athletes/{{ athlete.id }}/archive" class="inline-form"
+            onsubmit="return confirm('{% if athlete.archived %}Restaurer{% else %}Archiver{% endif %} cet athlète ?');">
+        <button type="submit" class="btn btn-ghost">{% if athlete.archived %}Restaurer{% else %}Archiver{% endif %}</button>
+      </form>
+    </div>
+  </div>
+
+  {% if tests %}
+  <div class="evolution-section">
+    <h2>Évolution</h2>
+    <div class="chart-controls">
+      <label><input type="radio" name="metric" value="sit_rmssd" checked> RMSSD couché</label>
+      <label><input type="radio" name="metric" value="delta_hr"> Delta FC</label>
+      <label><input type="radio" name="metric" value="sit_hf"> HF couché</label>
+      <label><input type="radio" name="metric" value="std_lf_hf"> LF/HF debout</label>
+      <label><input type="radio" name="metric" value="sit_pns_index"> PNS</label>
+      <label><input type="radio" name="metric" value="sit_sns_index"> SNS</label>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="evolutionChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <h2>Historique ({{ tests | length }} test{% if tests|length > 1 %}s{% endif %})</h2>
+  <div class="tests-table-wrap">
+  <table class="tests-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Statut</th>
+        <th>Type</th>
+        <th>ΔFC</th>
+        <th>RMSSD couché</th>
+        <th>LF/HF debout</th>
+        <th>SampEn</th>
+        <th>RPE</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in tests %}
+      <tr>
+        <td>{{ t.test_date.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td><span class="status-dot status-{{ t.fatigue_color }}"></span></td>
+        <td>{{ t.fatigue_label }}</td>
+        <td>{{ '%.0f' | format(t.delta_hr) }} bpm</td>
+        <td>{{ '%.0f' | format(t.sit_rmssd) }} ms</td>
+        <td>{{ '%.2f' | format(t.std_lf_hf) }}</td>
+        <td>{{ '%.2f' | format(t.sit_sampen) }}</td>
+        <td>{{ t.rpe or '—' }}</td>
+        <td><a href="/tests/{{ t.id }}" class="btn-link">Voir</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+    <div class="empty-state">
+      <p>Aucun test pour le moment.</p>
+      <a href="/tests/new?athlete_id={{ athlete.id }}" class="btn btn-primary">Importer un premier test</a>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+{% if tests %}
+<script>
+  window.HRV = window.HRV || {};
+  window.HRV.athleteId = {{ athlete.id }};
+  document.addEventListener('DOMContentLoaded', () => initEvolutionChart(window.HRV.athleteId));
+</script>
+{% endif %}
+{% endblock %}

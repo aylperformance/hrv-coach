@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}Test du {{ test.test_date.strftime('%d/%m/%Y') }} — {{ athlete.display_name }}{% endblock %}
+
+{% block content %}
+<section class="section">
+  <nav class="breadcrumb">
+    <a href="/">Athlètes</a> ›
+    <a href="/athletes/{{ athlete.id }}">{{ athlete.display_name }}</a> ›
+    <span>Test du {{ test.test_date.strftime('%d/%m/%Y %H:%M') }}</span>
+  </nav>
+
+  <div class="result-banner banner-{{ test.fatigue_color }}">
+    <h1>{{ test.fatigue_label }}</h1>
+    <p class="banner-sub">
+      ΔFC {{ '%.0f' | format(test.delta_hr) }} bpm ·
+      FC couché {{ '%.0f' | format(test.sit_mean_hr) }} bpm ·
+      FC debout {{ '%.0f' | format(test.std_mean_hr) }} bpm
+    </p>
+  </div>
+
+  {% if test.alerts %}
+  <div class="alerts-row">
+    {% for a in test.alerts %}
+      <div class="alert alert-{{ a.level }}">
+        <strong>{{ a.label }}</strong>
+        <span>{{ a.detail }}</span>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if test.dfa_badge %}
+  <div class="dfa-badge dfa-{{ test.dfa_badge.level }}">
+    <strong>DFA α1 = {{ test.dfa_badge.value }}</strong> · {{ test.dfa_badge.label }}
+  </div>
+  {% endif %}
+
+  <div class="lf-hf-section">
+    <div class="lf-hf-head">
+      <h2>Bilan LF / HF / FC</h2>
+      <div class="scale-control">
+        <label for="lfhfScale">Échelle LF/HF (max) :</label>
+        <input id="lfhfScale" type="range" min="500" max="20000" step="500" value="3000">
+        <span id="lfhfScaleValue">3000</span> ms²
+        <button type="button" id="lfhfAuto" class="btn btn-ghost btn-sm">Auto</button>
+      </div>
+    </div>
+    <div class="lf-hf-grid">
+      <div class="lf-hf-card">
+        <h3>Analyse du jour</h3>
+        <div class="chart-wrap"><canvas id="todayChart" height="180"></canvas></div>
+      </div>
+      <div class="lf-hf-card">
+        <h3>Médiane (30 derniers jours)
+          {% if median.n_tests %}
+            <small>· {{ median.n_tests }} test{% if median.n_tests > 1 %}s{% endif %}</small>
+          {% else %}
+            <small class="muted">· aucune donnée</small>
+          {% endif %}
+        </h3>
+        <div class="chart-wrap"><canvas id="medianChart" height="180"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-cols">
+    <div class="col">
+      <h2>Recommandations</h2>
+      <ul class="reco-list">
+        {% for r in test.recommendations %}
+          <li>{{ r }}</li>
+        {% endfor %}
+      </ul>
+      {% if test.comment %}
+        <h3>Commentaire</h3>
+        <p class="comment-box">{{ test.comment }}</p>
+      {% endif %}
+      {% if test.rpe %}
+        <p><strong>RPE veille :</strong> {{ test.rpe }}/10</p>
+      {% endif %}
+    </div>
+
+    <div class="col">
+      <h2>Marqueurs clés</h2>
+      <table class="markers-table">
+        <tr>
+          <td>RMSSD couché</td>
+          <td class="marker-{{ colors.sit_rmssd }}">{{ '%.0f' | format(test.sit_rmssd) }} ms</td>
+        </tr>
+        <tr>
+          <td>HF couché</td>
+          <td class="marker-{{ colors.sit_hf }}">{{ '%.0f' | format(test.sit_hf) }} ms²</td>
+        </tr>
+        <tr>
+          <td>LF/HF debout</td>
+          <td class="marker-{{ colors.std_lf_hf }}">{{ '%.2f' | format(test.std_lf_hf) }}</td>
+        </tr>
+        <tr>
+          <td>Delta FC</td>
+          <td class="marker-{{ colors.delta_hr }}">{{ '%.0f' | format(test.delta_hr) }} bpm</td>
+        </tr>
+        <tr>
+          <td>SampEn couché</td>
+          <td class="marker-{{ colors.sit_sampen }}">{{ '%.2f' | format(test.sit_sampen) }}</td>
+        </tr>
+        <tr>
+          <td>DFA α1 couché</td>
+          <td class="marker-{{ colors.sit_dfa_alpha1 }}">{{ '%.2f' | format(test.sit_dfa_alpha1) }}</td>
+        </tr>
+        <tr>
+          <td>PNS index couché</td>
+          <td>{{ '%.2f' | format(test.sit_pns_index) }}</td>
+        </tr>
+        <tr>
+          <td>SNS index couché</td>
+          <td>{{ '%.2f' | format(test.sit_sns_index) }}</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <h2>Détail complet</h2>
+  <div class="metrics-grid">
+    <div class="metrics-card">
+      <h3>Position couchée <small>({{ test.sit_n_beats }} beats · {{ '%.0f' | format(test.sit_duration_s) }}s)</small></h3>
+      <table class="markers-table">
+        <tr><td>Mean RR</td><td>{{ '%.0f' | format(test.sit_mean_rr) }} ms</td></tr>
+        <tr><td>Mean HR</td><td>{{ '%.1f' | format(test.sit_mean_hr) }} bpm</td></tr>
+        <tr><td>Min / Max HR</td><td>{{ '%.0f' | format(test.sit_min_hr) }} / {{ '%.0f' | format(test.sit_max_hr) }} bpm</td></tr>
+        <tr><td>SDNN</td><td>{{ '%.1f' | format(test.sit_sdnn) }} ms</td></tr>
+        <tr><td>RMSSD</td><td>{{ '%.1f' | format(test.sit_rmssd) }} ms</td></tr>
+        <tr><td>pNN50</td><td>{{ '%.1f' | format(test.sit_pnn50) }} %</td></tr>
+        <tr><td>VLF</td><td>{{ '%.0f' | format(test.sit_vlf) }} ms²</td></tr>
+        <tr><td>LF</td><td>{{ '%.0f' | format(test.sit_lf) }} ms²</td></tr>
+        <tr><td>HF</td><td>{{ '%.0f' | format(test.sit_hf) }} ms²</td></tr>
+        <tr><td>Total Power</td><td>{{ '%.0f' | format(test.sit_total_power) }} ms²</td></tr>
+        <tr><td>LF/HF</td><td>{{ '%.2f' | format(test.sit_lf_hf) }}</td></tr>
+        <tr><td>LF / HF n.u.</td><td>{{ '%.1f' | format(test.sit_lf_nu) }} / {{ '%.1f' | format(test.sit_hf_nu) }}</td></tr>
+        <tr><td>SD1 / SD2</td><td>{{ '%.1f' | format(test.sit_sd1) }} / {{ '%.1f' | format(test.sit_sd2) }} ms</td></tr>
+        <tr><td>SD2/SD1</td><td>{{ '%.2f' | format(test.sit_sd2_sd1) }}</td></tr>
+        <tr><td>SampEn</td><td>{{ '%.2f' | format(test.sit_sampen) }}</td></tr>
+        <tr><td>DFA α1</td><td>{{ '%.2f' | format(test.sit_dfa_alpha1) }}</td></tr>
+        <tr><td>Stress Index</td><td>{{ '%.1f' | format(test.sit_stress_index) }}</td></tr>
+        <tr><td>PNS / SNS</td><td>{{ '%.2f' | format(test.sit_pns_index) }} / {{ '%.2f' | format(test.sit_sns_index) }}</td></tr>
+      </table>
+    </div>
+
+    <div class="metrics-card">
+      <h3>Position debout <small>({{ test.std_n_beats }} beats · {{ '%.0f' | format(test.std_duration_s) }}s)</small></h3>
+      <table class="markers-table">
+        <tr><td>Mean RR</td><td>{{ '%.0f' | format(test.std_mean_rr) }} ms</td></tr>
+        <tr><td>Mean HR</td><td>{{ '%.1f' | format(test.std_mean_hr) }} bpm</td></tr>
+        <tr><td>Min / Max HR</td><td>{{ '%.0f' | format(test.std_min_hr) }} / {{ '%.0f' | format(test.std_max_hr) }} bpm</td></tr>
+        <tr><td>SDNN</td><td>{{ '%.1f' | format(test.std_sdnn) }} ms</td></tr>
+        <tr><td>RMSSD</td><td>{{ '%.1f' | format(test.std_rmssd) }} ms</td></tr>
+        <tr><td>pNN50</td><td>{{ '%.1f' | format(test.std_pnn50) }} %</td></tr>
+        <tr><td>VLF</td><td>{{ '%.0f' | format(test.std_vlf) }} ms²</td></tr>
+        <tr><td>LF</td><td>{{ '%.0f' | format(test.std_lf) }} ms²</td></tr>
+        <tr><td>HF</td><td>{{ '%.0f' | format(test.std_hf) }} ms²</td></tr>
+        <tr><td>Total Power</td><td>{{ '%.0f' | format(test.std_total_power) }} ms²</td></tr>
+        <tr><td>LF/HF</td><td>{{ '%.2f' | format(test.std_lf_hf) }}</td></tr>
+        <tr><td>LF / HF n.u.</td><td>{{ '%.1f' | format(test.std_lf_nu) }} / {{ '%.1f' | format(test.std_hf_nu) }}</td></tr>
+        <tr><td>SD1 / SD2</td><td>{{ '%.1f' | format(test.std_sd1) }} / {{ '%.1f' | format(test.std_sd2) }} ms</td></tr>
+        <tr><td>SD2/SD1</td><td>{{ '%.2f' | format(test.std_sd2_sd1) }}</td></tr>
+        <tr><td>SampEn</td><td>{{ '%.2f' | format(test.std_sampen) }}</td></tr>
+        <tr><td>DFA α1</td><td>{{ '%.2f' | format(test.std_dfa_alpha1) }}</td></tr>
+        <tr><td>Stress Index</td><td>{{ '%.1f' | format(test.std_stress_index) }}</td></tr>
+        <tr><td>PNS / SNS</td><td>{{ '%.2f' | format(test.std_pns_index) }} / {{ '%.2f' | format(test.std_sns_index) }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="test-meta">
+    <p>
+      Source : {{ test.source_filename or '—' }} ({{ test.source_type }}) ·
+      {{ test.n_beats_total }} beats au total ·
+      {{ test.n_artifacts_removed }} artefact{% if test.n_artifacts_removed > 1 %}s{% endif %} corrigé{% if test.n_artifacts_removed > 1 %}s{% endif %} ·
+      Transition à {{ '%.0f' | format(test.transition_time_s) }}s
+    </p>
+    <form method="post" action="/tests/{{ test.id }}/delete" class="inline-form"
+          onsubmit="return confirm('Supprimer définitivement ce test ?');">
+      <button type="submit" class="btn btn-danger">Supprimer ce test</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.HRV = window.HRV || {};
+  window.HRV.testData = {
+    today: {
+      sit_lf: {{ test.sit_lf }},
+      sit_hf: {{ test.sit_hf }},
+      sit_hr: {{ test.sit_mean_hr }},
+      std_lf: {{ test.std_lf }},
+      std_hf: {{ test.std_hf }},
+      std_hr: {{ test.std_mean_hr }}
+    },
+    median: {
+      sit_lf: {{ median.sit_lf }},
+      sit_hf: {{ median.sit_hf }},
+      sit_hr: {{ median.sit_mean_hr }},
+      std_lf: {{ median.std_lf }},
+      std_hf: {{ median.std_hf }},
+      std_hr: {{ median.std_mean_hr }},
+      n_tests: {{ median.n_tests }}
+    }
+  };
+  document.addEventListener('DOMContentLoaded', () => initTestDetailCharts());
+</script>
+{% endblock %}

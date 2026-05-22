@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Athlètes archivés — HRV Coach{% endblock %}
+
+{% block content %}
+<section class="section">
+  <nav class="breadcrumb">
+    <a href="/">Athlètes</a> › <span>Archivés</span>
+  </nav>
+  <h1>Athlètes archivés</h1>
+  {% if athletes %}
+    <ul class="archived-list">
+      {% for a in athletes %}
+        <li>
+          <a href="/athletes/{{ a.id }}">{{ a.display_name }}</a>
+          <span class="muted">{{ a.sport or '—' }}</span>
+          <form method="post" action="/athletes/{{ a.id }}/archive" class="inline-form">
+            <button class="btn-link">Restaurer</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Aucun athlète archivé.</p>
+  {% endif %}
+</section>
+{% endblock %}

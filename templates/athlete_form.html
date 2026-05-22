@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — HRV Coach{% endblock %}
+
+{% block content %}
+<section class="section">
+  <h1>{{ title }}</h1>
+  <form method="post" action="{{ action }}" class="form-card">
+    <div class="form-row">
+      <label for="last_name">Nom *</label>
+      <input id="last_name" name="last_name" type="text" required
+             value="{{ athlete.last_name if athlete else '' }}">
+    </div>
+    <div class="form-row">
+      <label for="first_name">Prénom *</label>
+      <input id="first_name" name="first_name" type="text" required
+             value="{{ athlete.first_name if athlete else '' }}">
+    </div>
+    <div class="form-row">
+      <label for="birth_date">Date de naissance</label>
+      <input id="birth_date" name="birth_date" type="date"
+             value="{{ athlete.birth_date.isoformat() if athlete and athlete.birth_date else '' }}">
+    </div>
+    <div class="form-row">
+      <label for="sex">Sexe</label>
+      <select id="sex" name="sex">
+        <option value="M" {% if athlete and athlete.sex == 'M' %}selected{% endif %}>Masculin</option>
+        <option value="F" {% if athlete and athlete.sex == 'F' %}selected{% endif %}>Féminin</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="sport">Sport pratiqué</label>
+      <input id="sport" name="sport" type="text"
+             value="{{ athlete.sport if athlete else '' }}">
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Enregistrer</button>
+      <a href="{% if athlete %}/athletes/{{ athlete.id }}{% else %}/{% endif %}" class="btn btn-ghost">Annuler</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Athlètes — HRV Coach{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="section-head">
+    <h1>Tableau de bord</h1>
+    <div class="filter-bar">
+      <span class="filter-label">Filtrer :</span>
+      <a href="/" class="chip {% if not status_filter %}chip-active{% endif %}">Tous</a>
+      <a href="/?status=red" class="chip chip-red {% if status_filter == 'red' %}chip-active{% endif %}">Alertes</a>
+      <a href="/?status=orange" class="chip chip-orange {% if status_filter == 'orange' %}chip-active{% endif %}">Vigilance</a>
+      <a href="/?status=green" class="chip chip-green {% if status_filter == 'green' %}chip-active{% endif %}">OK</a>
+    </div>
+  </div>
+
+  {% if today_tests %}
+  <div class="snapshot">
+    <h2>Snapshot du jour</h2>
+    <div class="snapshot-row">
+      {% for t in today_tests %}
+        <a href="/tests/{{ t.id }}" class="snapshot-item snapshot-{{ t.fatigue_color }}">
+          <strong>{{ t.athlete.display_name }}</strong>
+          <span>{{ t.test_date.strftime('%H:%M') }} · ΔFC {{ '%.0f' | format(t.delta_hr) }} bpm</span>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if cards %}
+  <div class="cards-grid">
+    {% for c in cards %}
+      <a href="/athletes/{{ c.athlete.id }}" class="card card-{{ c.color }}">
+        <div class="card-head">
+          <div class="avatar avatar-{{ c.color }}">{{ c.athlete.initials }}</div>
+          <div class="card-meta">
+            <h3>{{ c.athlete.display_name }}</h3>
+            <small>{{ c.athlete.sport or '—' }}</small>
+          </div>
+          <span class="status-dot status-{{ c.color }}" title="{{ c.label }}"></span>
+        </div>
+        <div class="card-body">
+          {% if c.last_test %}
+            <div class="card-label">{{ c.label }}</div>
+            <div class="card-stats">
+              <span><strong>ΔFC</strong> {{ '%.0f' | format(c.last_test.delta_hr) }} bpm</span>
+              <span><strong>RMSSD</strong> {{ '%.0f' | format(c.last_test.sit_rmssd) }} ms</span>
+            </div>
+            <small class="card-date">Dernier test : {{ c.last_test.test_date.strftime('%d/%m/%Y') }}</small>
+          {% else %}
+            <em>Aucun test enregistré</em>
+          {% endif %}
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+  {% else %}
+    <div class="empty-state">
+      <p>Aucun athlète {% if status_filter %}avec ce statut{% endif %}.</p>
+      <a href="/athletes/new" class="btn btn-primary">Créer un athlète</a>
+    </div>
+  {% endif %}
+
+  {% if archived_count %}
+    <p class="archived-link"><a href="/archived">Voir les {{ archived_count }} athlète(s) archivé(s)</a></p>
+  {% endif %}
+</section>
+{% endblock %}

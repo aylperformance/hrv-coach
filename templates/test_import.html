@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Importer un test — HRV Coach{% endblock %}
+
+{% block content %}
+<section class="section">
+  <h1>Importer un test HRV</h1>
+
+  <div id="step1" class="form-card">
+    <h2>1. Sélection du fichier</h2>
+    <form id="previewForm">
+      <div class="form-row">
+        <label for="athlete_id">Athlète *</label>
+        <select id="athlete_id" name="athlete_id" required>
+          <option value="">— Sélectionner —</option>
+          {% for a in athletes %}
+            <option value="{{ a.id }}" {% if selected and selected.id == a.id %}selected{% endif %}>
+              {{ a.display_name }}{% if a.sport %} ({{ a.sport }}){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>Fichier (.txt RR brut ou .csv Kubios) *</label>
+        <div id="dropzone" class="dropzone">
+          <p>Glissez votre fichier ici ou <label for="file" class="link">cliquez pour le sélectionner</label>.</p>
+          <input id="file" name="file" type="file" accept=".txt,.csv,text/plain,text/csv" required hidden>
+          <div id="fileName" class="file-name"></div>
+        </div>
+      </div>
+
+      <div class="form-row form-checkbox">
+        <label>
+          <input type="checkbox" id="correct_artifacts" name="correct_artifacts" value="1" checked>
+          Filtre physiologique (recommandé)
+        </label>
+        <p class="hint">3 couches : bornes RR 300-2000 ms · diff RR-RR &gt; 400 ms · Malik 30 %.
+        Élimine les battements manqués et détections doubles sans écraser la HRV physiologique. Décocher pour matcher Kubios brut.</p>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Analyser</button>
+        <a href="/" class="btn btn-ghost">Annuler</a>
+      </div>
+      <div id="previewError" class="error-box" hidden></div>
+    </form>
+  </div>
+
+  <div id="step2" class="form-card" hidden>
+    <h2>2. Aperçu et validation</h2>
+    <div id="previewSummary"></div>
+    <div id="transitionEditor" class="transition-editor" hidden>
+      <h3>Point de transition couché → debout</h3>
+      <p class="hint">Curseur ajustable. Le segment vert = couché (avant), bleu = debout (après). 1ʳᵉ minute de chaque segment exclue automatiquement.</p>
+      <div class="chart-wrap"><canvas id="transitionChart" height="100"></canvas></div>
+      <div class="transition-controls">
+        <input id="transitionSlider" type="range" min="0" max="100" value="50">
+        <span id="transitionLabel"></span>
+      </div>
+    </div>
+
+    <form id="confirmForm" method="post" action="/tests/confirm" class="form-card-inner">
+      <input type="hidden" name="token" id="confirmToken">
+      <input type="hidden" name="transition_index" id="confirmTransition">
+      <div class="form-row">
+        <label for="test_date">Date du test</label>
+        <input id="test_date" name="test_date" type="datetime-local">
+      </div>
+      <div class="form-row">
+        <label for="rpe">RPE de la veille (1-10)</label>
+        <input id="rpe" name="rpe" type="number" min="1" max="10">
+      </div>
+      <div class="form-row">
+        <label for="comment">Commentaire</label>
+        <textarea id="comment" name="comment" rows="3" placeholder="Veille compétition, mauvaise nuit, etc."></textarea>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Enregistrer le test</button>
+        <button type="button" id="cancelPreview" class="btn btn-ghost">Annuler</button>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => initImportFlow());
+</script>
+{% endblock %}
