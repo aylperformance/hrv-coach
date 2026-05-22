@@ -21,10 +21,10 @@ RUN pip install -r requirements.txt
 # Copier le code
 COPY . .
 
-# Volume pour la base SQLite persistante
+# Dossier pour la base SQLite — le volume persistant est monté par Railway
+# via le dashboard sur le path /data (pas via la directive VOLUME)
 RUN mkdir -p /data
 ENV HRV_DB_PATH=/data/hrv_coach.db
-VOLUME ["/data"]
 
 # Le port d'écoute (Railway/Render injectent $PORT)
 ENV PORT=8000
