@@ -265,44 +265,66 @@ function initBulkImport() {
     errorBox.hidden = true;
 
     const athleteId = document.getElementById('athlete_id').value;
+    const athleteName = document.getElementById('athlete_id').selectedOptions[0].textContent.trim();
     if (!athleteId) { showError(errorBox, 'Sélectionne un athlète.'); return; }
     if (!fileInput.files.length) { showError(errorBox, 'Sélectionne au moins un fichier.'); return; }
 
+    const correctArtifacts = document.getElementById('correct_artifacts_bulk').checked;
+    const files = Array.from(fileInput.files);
+
     document.getElementById('step1').hidden = true;
     document.getElementById('bulkProgress').hidden = false;
-    document.getElementById('progressText').textContent = `Analyse de ${fileInput.files.length} fichier(s)…`;
-    document.getElementById('progressFill').style.width = '20%';
+    const progressText = document.getElementById('progressText');
+    const progressFill = document.getElementById('progressFill');
 
-    const fd = new FormData();
-    fd.append('athlete_id', athleteId);
-    if (document.getElementById('correct_artifacts_bulk').checked) {
-      fd.append('correct_artifacts', '1');
-    }
-    for (const f of fileInput.files) fd.append('files', f);
+    // Traiter les fichiers un par un séquentiellement
+    const results = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      progressText.textContent = `Fichier ${i+1} / ${files.length} : ${f.name}`;
+      progressFill.style.width = `${Math.round(100 * i / files.length)}%`;
 
-    try {
-      // Animation de progression "fictive" : on ne sait pas exactement où en est le serveur
-      let progress = 20;
-      const interval = setInterval(() => {
-        progress = Math.min(90, progress + 5);
-        document.getElementById('progressFill').style.width = progress + '%';
-      }, 800);
+      const fd = new FormData();
+      fd.append('athlete_id', athleteId);
+      fd.append('file', f);
+      if (correctArtifacts) fd.append('correct_artifacts', '1');
 
-      const resp = await fetch('/tests/bulk_upload', { method: 'POST', body: fd });
-      clearInterval(interval);
-      document.getElementById('progressFill').style.width = '100%';
-
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.detail || `Erreur ${resp.status}`);
+      try {
+        const resp = await fetch('/tests/single_upload', { method: 'POST', body: fd });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          results.push({
+            filename: f.name,
+            status: 'error',
+            message: err.detail || `HTTP ${resp.status}`,
+          });
+        } else {
+          const data = await resp.json();
+          results.push(data);
+        }
+      } catch (err) {
+        results.push({
+          filename: f.name,
+          status: 'error',
+          message: err.message || 'Erreur réseau',
+        });
       }
-      const data = await resp.json();
-      showBulkResults(data);
-    } catch (err) {
-      document.getElementById('bulkProgress').hidden = true;
-      document.getElementById('step1').hidden = false;
-      showError(errorBox, err.message);
     }
+    progressFill.style.width = '100%';
+    progressText.textContent = 'Terminé.';
+
+    const summary = {
+      total: results.length,
+      ok: results.filter(r => r.status === 'ok').length,
+      skipped: results.filter(r => r.status === 'skipped').length,
+      error: results.filter(r => r.status === 'error').length,
+    };
+
+    showBulkResults({
+      athlete: { id: athleteId, name: athleteName },
+      results,
+      summary,
+    });
   });
 
   document.getElementById('bulkRestart')?.addEventListener('click', () => {
