@@ -42,6 +42,134 @@ def new_form(
     )
 
 
+@router.get("/bulk", response_class=HTMLResponse)
+def bulk_form(
+    request: Request,
+    athlete_id: int | None = None,
+    db: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Formulaire d'import multiple."""
+    athletes = db.query(Athlete).filter_by(archived=False).order_by(Athlete.last_name).all()
+    selected = db.get(Athlete, athlete_id) if athlete_id else None
+    return templates.TemplateResponse(
+        request,
+        "test_bulk.html",
+        {"athletes": athletes, "selected": selected},
+    )
+
+
+@router.post("/bulk_upload")
+async def bulk_upload(
+    files: list[UploadFile] = File(...),
+    athlete_id: int = Form(...),
+    correct_artifacts: str = Form(""),
+    db: Session = Depends(get_session),
+) -> JSONResponse:
+    """Upload + analyse + sauvegarde de N fichiers d'un coup.
+
+    Détection automatique de la transition (pas de preview manuelle).
+    Date extraite du nom de fichier.
+    Si un fichier de même date existe déjà pour l'athlète, il est ignoré.
+    """
+    athlete = db.get(Athlete, athlete_id)
+    if not athlete:
+        raise HTTPException(404, "Athlète introuvable")
+
+    do_correct = correct_artifacts in ("1", "true", "on", "yes")
+
+    results: list[dict[str, Any]] = []
+
+    for f in files:
+        fname = f.filename or "upload.txt"
+        entry: dict[str, Any] = {"filename": fname, "status": "ok", "message": ""}
+
+        try:
+            raw = await f.read()
+            try:
+                content = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                content = raw.decode("latin-1", errors="replace")
+
+            extracted_dt = extract_date_from_filename(fname)
+            if not extracted_dt:
+                entry["status"] = "skipped"
+                entry["message"] = "Date non détectable dans le nom de fichier"
+                results.append(entry)
+                continue
+
+            # Doublon ? Même athlète + même date à la minute près
+            existing = (
+                db.query(Test)
+                .filter(Test.athlete_id == athlete.id)
+                .filter(Test.test_date == extracted_dt)
+                .first()
+            )
+            if existing:
+                entry["status"] = "skipped"
+                entry["message"] = f"Test déjà existant ({extracted_dt.strftime('%d/%m/%Y %H:%M')})"
+                results.append(entry)
+                continue
+
+            suffix = Path(fname).suffix.lower()
+            if suffix == ".csv" or "RESULTS FOR SINGLE SAMPLES" in content.upper():
+                source_type = "kubios_csv"
+                result = analyze_kubios_csv(content)
+                if result is None:
+                    entry["status"] = "error"
+                    entry["message"] = "CSV Kubios non parsable"
+                    results.append(entry)
+                    continue
+            else:
+                source_type = "txt"
+                rr = parse_rr_txt(content)
+                if len(rr) < 50:
+                    entry["status"] = "error"
+                    entry["message"] = f"Trop court ({len(rr)} beats)"
+                    results.append(entry)
+                    continue
+                result = analyze_rr_file(rr, clean=do_correct)
+
+            test = Test(
+                athlete_id=athlete.id,
+                test_date=extracted_dt,
+                source_filename=fname,
+                source_type=source_type,
+                comment="",
+                rpe=None,
+            )
+            apply_analysis_to_test(test, result)
+            db.add(test)
+            db.commit()
+
+            entry["message"] = (
+                f"{extracted_dt.strftime('%d/%m/%Y %H:%M')} · "
+                f"{result.fatigue_label} · ΔFC {result.delta_hr:.0f} bpm"
+            )
+            entry["test_id"] = test.id
+            entry["fatigue_color"] = result.fatigue_color
+        except Exception as e:
+            db.rollback()
+            entry["status"] = "error"
+            entry["message"] = f"Erreur : {type(e).__name__} - {str(e)[:100]}"
+
+        results.append(entry)
+
+    n_ok = sum(1 for r in results if r["status"] == "ok")
+    n_skipped = sum(1 for r in results if r["status"] == "skipped")
+    n_error = sum(1 for r in results if r["status"] == "error")
+
+    return JSONResponse({
+        "athlete": {"id": athlete.id, "name": athlete.display_name},
+        "results": results,
+        "summary": {
+            "total": len(results),
+            "ok": n_ok,
+            "skipped": n_skipped,
+            "error": n_error,
+        },
+    })
+
+
 @router.post("/preview")
 async def preview(
     file: UploadFile = File(...),

@@ -107,7 +107,7 @@ class AnalysisResult:
 # Parsing des fichiers
 # =============================================================================
 
-DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})(?:[_T-](\d{2})[-:](\d{2})(?:[-:](\d{2}))?)?")
+DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})(?:[\s_T-]+(\d{2})[-:](\d{2})(?:[-:](\d{2}))?)?")
 
 
 def extract_date_from_filename(filename: str) -> datetime | None:

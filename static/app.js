@@ -221,6 +221,128 @@ function escapeHtml(s) {
 }
 
 // =============================================================================
+// Import multiple (bulk) — sélection N fichiers, traitement en série
+// =============================================================================
+
+function initBulkImport() {
+  const form = document.getElementById('bulkForm');
+  if (!form) return;
+
+  const dropzone = document.getElementById('bulkDropzone');
+  const fileInput = document.getElementById('bulkFiles');
+  const fileList = document.getElementById('bulkFileList');
+  const errorBox = document.getElementById('bulkError');
+
+  dropzone.addEventListener('click', (e) => {
+    if (e.target.tagName !== 'LABEL') fileInput.click();
+  });
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+      renderFileList();
+    }
+  });
+  fileInput.addEventListener('change', renderFileList);
+
+  function renderFileList() {
+    const files = Array.from(fileInput.files);
+    if (!files.length) { fileList.innerHTML = ''; return; }
+    const html = `<strong>${files.length} fichier${files.length > 1 ? 's' : ''} sélectionné${files.length > 1 ? 's' : ''} :</strong><ul style="margin:6px 0 0;padding-left:18px;font-weight:normal;">` +
+      files.map(f => `<li>${escapeHtml(f.name)} <small>(${(f.size/1024).toFixed(1)} KB)</small></li>`).join('') +
+      '</ul>';
+    fileList.innerHTML = html;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.hidden = true;
+
+    const athleteId = document.getElementById('athlete_id').value;
+    if (!athleteId) { showError(errorBox, 'Sélectionne un athlète.'); return; }
+    if (!fileInput.files.length) { showError(errorBox, 'Sélectionne au moins un fichier.'); return; }
+
+    document.getElementById('step1').hidden = true;
+    document.getElementById('bulkProgress').hidden = false;
+    document.getElementById('progressText').textContent = `Analyse de ${fileInput.files.length} fichier(s)…`;
+    document.getElementById('progressFill').style.width = '20%';
+
+    const fd = new FormData();
+    fd.append('athlete_id', athleteId);
+    if (document.getElementById('correct_artifacts_bulk').checked) {
+      fd.append('correct_artifacts', '1');
+    }
+    for (const f of fileInput.files) fd.append('files', f);
+
+    try {
+      // Animation de progression "fictive" : on ne sait pas exactement où en est le serveur
+      let progress = 20;
+      const interval = setInterval(() => {
+        progress = Math.min(90, progress + 5);
+        document.getElementById('progressFill').style.width = progress + '%';
+      }, 800);
+
+      const resp = await fetch('/tests/bulk_upload', { method: 'POST', body: fd });
+      clearInterval(interval);
+      document.getElementById('progressFill').style.width = '100%';
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || `Erreur ${resp.status}`);
+      }
+      const data = await resp.json();
+      showBulkResults(data);
+    } catch (err) {
+      document.getElementById('bulkProgress').hidden = true;
+      document.getElementById('step1').hidden = false;
+      showError(errorBox, err.message);
+    }
+  });
+
+  document.getElementById('bulkRestart')?.addEventListener('click', () => {
+    document.getElementById('bulkResults').hidden = true;
+    document.getElementById('step1').hidden = false;
+    fileInput.value = '';
+    fileList.innerHTML = '';
+  });
+}
+
+function showBulkResults(data) {
+  document.getElementById('bulkProgress').hidden = true;
+  document.getElementById('bulkResults').hidden = false;
+
+  const s = data.summary;
+  document.getElementById('bulkSummary').innerHTML = `
+    <div class="bulk-stat"><span class="bulk-stat-num">${s.total}</span><span>fichier${s.total>1?'s':''}</span></div>
+    <div class="bulk-stat bulk-ok"><span class="bulk-stat-num">${s.ok}</span><span>importé${s.ok>1?'s':''}</span></div>
+    <div class="bulk-stat bulk-warn"><span class="bulk-stat-num">${s.skipped}</span><span>ignoré${s.skipped>1?'s':''}</span></div>
+    <div class="bulk-stat bulk-err"><span class="bulk-stat-num">${s.error}</span><span>erreur${s.error>1?'s':''}</span></div>
+  `;
+
+  const tbody = document.getElementById('bulkResultsBody');
+  tbody.innerHTML = data.results.map(r => {
+    const statusClass = r.status === 'ok' ? 'res-ok' : (r.status === 'skipped' ? 'res-skip' : 'res-err');
+    const statusIcon = r.status === 'ok' ? '✓' : (r.status === 'skipped' ? '–' : '✕');
+    const dot = r.fatigue_color ? `<span class="status-dot status-${r.fatigue_color}"></span> ` : '';
+    const link = r.test_id ? `<a href="/tests/${r.test_id}" class="btn-link">Voir</a>` : '';
+    return `<tr>
+      <td><span class="bulk-status ${statusClass}">${statusIcon}</span></td>
+      <td>${escapeHtml(r.filename)}</td>
+      <td>${dot}${escapeHtml(r.message)}</td>
+      <td>${link}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('bulkSeeAthlete').href = `/athletes/${data.athlete.id}`;
+}
+
+// =============================================================================
 // Détail test : graphiques LF/HF/FC (jour + médiane) avec curseur d'échelle
 // =============================================================================
 

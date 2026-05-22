@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Import multiple — HRV Coach{% endblock %}
+
+{% block content %}
+<section class="section">
+  <nav class="breadcrumb">
+    <a href="/">Athlètes</a> ›
+    <a href="/tests/new">Import test</a> ›
+    <span>Import multiple</span>
+  </nav>
+
+  <h1>Import multiple de tests HRV</h1>
+  <p class="hint">
+    Sélectionne plusieurs fichiers <code>.txt</code> ou <code>.csv</code> pour un même athlète.
+    La date est extraite automatiquement du nom de fichier (<code>YYYY-MM-DD…</code>).
+    Les doublons (même date) sont ignorés. Aucune correction manuelle de transition — détection automatique uniquement.
+  </p>
+
+  <div id="step1" class="form-card">
+    <form id="bulkForm">
+      <div class="form-row">
+        <label for="athlete_id">Athlète *</label>
+        <select id="athlete_id" name="athlete_id" required>
+          <option value="">— Sélectionner —</option>
+          {% for a in athletes %}
+            <option value="{{ a.id }}" {% if selected and selected.id == a.id %}selected{% endif %}>
+              {{ a.display_name }}{% if a.sport %} ({{ a.sport }}){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>Fichiers (sélection multiple) *</label>
+        <div id="bulkDropzone" class="dropzone">
+          <p>Glisse plusieurs fichiers ici, ou <label for="bulkFiles" class="link">clique pour sélectionner</label>.</p>
+          <input id="bulkFiles" name="files" type="file" accept=".txt,.csv,text/plain,text/csv" required multiple hidden>
+          <div id="bulkFileList" class="file-name"></div>
+        </div>
+      </div>
+
+      <div class="form-row form-checkbox">
+        <label>
+          <input type="checkbox" id="correct_artifacts_bulk" name="correct_artifacts" value="1" checked>
+          Filtre physiologique (recommandé)
+        </label>
+        <p class="hint">3 couches : bornes RR 300-2000 ms · diff RR-RR &gt; 400 ms · Malik 30 %.</p>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Lancer l'import</button>
+        <a href="/tests/new" class="btn btn-ghost">Import simple (avec preview)</a>
+      </div>
+      <div id="bulkError" class="error-box" hidden></div>
+    </form>
+  </div>
+
+  <div id="bulkProgress" class="form-card" hidden>
+    <h2>Import en cours…</h2>
+    <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+    <p id="progressText" class="hint"></p>
+  </div>
+
+  <div id="bulkResults" class="form-card" hidden>
+    <h2>Résultats de l'import</h2>
+    <div id="bulkSummary" class="bulk-summary"></div>
+    <table class="bulk-results-table">
+      <thead>
+        <tr>
+          <th>Statut</th>
+          <th>Fichier</th>
+          <th>Détail</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="bulkResultsBody"></tbody>
+    </table>
+    <div class="form-actions" style="margin-top:18px;">
+      <button type="button" id="bulkRestart" class="btn btn-ghost">Importer d'autres fichiers</button>
+      <a id="bulkSeeAthlete" href="#" class="btn btn-primary">Voir la fiche athlète</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => initBulkImport());
+</script>
+{% endblock %}
